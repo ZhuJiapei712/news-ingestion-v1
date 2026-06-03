@@ -1,0 +1,13 @@
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
+ENV NEWS_API_HOST=0.0.0.0
+ENV NEWS_API_PORT=8080
+ENV NEWS_REFRESH_INTERVAL_MINUTES=10
+
+WORKDIR /app
+COPY . /app
+
+EXPOSE 8080
+CMD ["python", "-m", "news_ingestion.api_server"]

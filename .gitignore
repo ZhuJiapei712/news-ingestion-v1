@@ -1,0 +1,33 @@
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Generated data. Keep templates/ for sample input instead.
+data/daily/
+data/empty_inbox/
+data/inbox/*
+!data/inbox/.gitkeep
+data/multisource_test/
+data/realtest/
+data/samples/
+data/doctor_sample/
+data/validated/
+data/tmp_*.html
+
+# Build/export artifacts
+dist/
+*.zip
+*.tar
+*.tar.gz
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

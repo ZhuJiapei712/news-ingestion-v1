@@ -1,0 +1,227 @@
+{
+  "schema_version": "1.0",
+  "owner": "财经新闻数据Agent-数据抓取组",
+  "timezone": "Asia/Shanghai",
+  "crawl_policy": {
+    "respect_robots_txt": true,
+    "min_interval_seconds_per_source": 30,
+    "max_retries": 2,
+    "timeout_seconds": 15,
+    "store_raw_response": true
+  },
+  "tiers": {
+    "T0": "官方公告、交易所、监管和公司信息披露，权威性最高，速度未必最快。",
+    "T1": "主流财经媒体和快讯源，适合捕捉当日热点。",
+    "T2": "社区和投资者讨论源，适合补充舆情，但噪声高。",
+    "T3": "行业媒体、研报摘要和补充来源，适合扩展覆盖。"
+  },
+  "sources": [
+    {
+      "source_id": "cninfo",
+      "name": "巨潮资讯",
+      "tier": "T0",
+      "role": "official_disclosure",
+      "priority": 1,
+      "enabled_for_v1": false,
+      "implementation_status": "planned",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://www.cninfo.com.cn/"
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 1.0,
+      "notes": "适合第二阶段补充公告和正式信息披露。"
+    },
+    {
+      "source_id": "sse",
+      "name": "上海证券交易所",
+      "tier": "T0",
+      "role": "official_exchange",
+      "priority": 2,
+      "enabled_for_v1": false,
+      "implementation_status": "planned",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://www.sse.com.cn/"
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 1.0,
+      "notes": "用于官方监管、公告和交易所信息。"
+    },
+    {
+      "source_id": "szse",
+      "name": "深圳证券交易所",
+      "tier": "T0",
+      "role": "official_exchange",
+      "priority": 3,
+      "enabled_for_v1": false,
+      "implementation_status": "planned",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://www.szse.cn/"
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 1.0,
+      "notes": "用于官方监管、公告和交易所信息。"
+    },
+    {
+      "source_id": "cls",
+      "name": "财联社",
+      "tier": "T1",
+      "role": "fast_news",
+      "priority": 4,
+      "enabled_for_v1": false,
+      "implementation_status": "needs_adapter_probe",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://www.cls.cn/"
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 0.95,
+      "notes": "快讯价值高。第一版先作为重点适配目标，正式抓取前需要确认页面结构、访问规则和稳定入口。"
+    },
+    {
+      "source_id": "eastmoney",
+      "name": "东方财富",
+      "tier": "T1",
+      "role": "market_news",
+      "priority": 5,
+      "enabled_for_v1": true,
+      "implementation_status": "html_adapter_candidate",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://finance.eastmoney.com/"
+        },
+        {
+          "type": "rolling_news",
+          "url": "https://finance.eastmoney.com/news/"
+        },
+        {
+          "type": "eastmoney_api",
+          "url": "https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?client=web&biz=web_news_col&column=350&page_size=20&page_index=1&req_trace=1",
+          "max_items": 20
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 0.9,
+      "notes": "已接入东方财富新闻 JSON API，默认最多抓取 20 条。"
+    },
+    {
+      "source_id": "sina_finance",
+      "name": "新浪财经",
+      "tier": "T1",
+      "role": "market_news",
+      "priority": 6,
+      "enabled_for_v1": true,
+        "implementation_status": "implemented_html_roll_list",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://finance.sina.com.cn/"
+        },
+        {
+          "type": "html_roll_list",
+          "url": "https://finance.sina.com.cn/roll/",
+          "max_items": 30,
+          "fetch_detail": true
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 0.88,
+        "notes": "已接入新浪财经滚动新闻 HTML 列表和详情页抽取，默认最多抓取 30 条。"
+    },
+    {
+      "source_id": "ths",
+      "name": "同花顺财经",
+      "tier": "T1",
+      "role": "market_news",
+      "priority": 7,
+      "enabled_for_v1": false,
+      "implementation_status": "needs_adapter_probe",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://www.10jqka.com.cn/"
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 0.88,
+      "notes": "第一版放入候选池，待页面结构和访问规则确认。"
+    },
+    {
+      "source_id": "stcn",
+      "name": "证券时报",
+      "tier": "T1",
+      "role": "market_news",
+      "priority": 8,
+      "enabled_for_v1": true,
+      "implementation_status": "implemented_html_article_list",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://www.stcn.com/article/index.html"
+        },
+        {
+          "type": "stcn_article_list",
+          "url": "https://www.stcn.com/article/index.html",
+          "max_items": 20,
+          "fetch_detail": true
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 0.9,
+      "notes": "已接入证券时报文章列表和详情页抽取，默认最多抓取 20 条。"
+    },
+    {
+      "source_id": "cctv_finance",
+      "name": "央视财经",
+      "tier": "T1",
+      "role": "market_news",
+      "priority": 9,
+      "enabled_for_v1": true,
+      "implementation_status": "implemented_homepage_article_list",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://finance.cctv.com/"
+        },
+        {
+          "type": "cctv_finance_home",
+          "url": "https://finance.cctv.com/",
+          "max_items": 20,
+          "fetch_detail": true
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content"],
+      "quality_weight": 0.92,
+      "notes": "已接入央视财经首页文章列表和详情页抽取，默认最多抓取 20 条。"
+    },
+    {
+      "source_id": "xueqiu",
+      "name": "雪球",
+      "tier": "T2",
+      "role": "community_sentiment",
+      "priority": 10,
+      "enabled_for_v1": false,
+      "implementation_status": "planned",
+      "entrypoints": [
+        {
+          "type": "homepage",
+          "url": "https://xueqiu.com/"
+        }
+      ],
+      "expected_fields": ["title", "url", "published_at", "content", "author"],
+      "quality_weight": 0.65,
+      "notes": "社区噪声高。建议第二阶段用于舆情热度，不作为第一版核心新闻源。"
+    }
+  ]
+}

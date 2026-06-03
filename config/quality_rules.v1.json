@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "required_fields": ["title", "url", "source", "crawled_at"],
+  "recommended_fields": ["published_at", "content"],
+  "thresholds": {
+    "min_title_chars": 6,
+    "min_content_chars_for_full_score": 180,
+    "min_content_chars_before_flag": 60,
+    "valid_score": 0.75,
+    "review_score": 0.45,
+    "published_after_crawled_tolerance_minutes": 10
+  },
+  "weights": {
+    "field_completeness": 0.35,
+    "content_readability": 0.25,
+    "timestamp_trust": 0.2,
+    "source_authority": 0.2
+  },
+  "critical_flags": [
+    "missing_title",
+    "missing_url",
+    "missing_source",
+    "missing_crawled_at",
+    "invalid_url",
+    "invalid_crawled_at"
+  ]
+}
+

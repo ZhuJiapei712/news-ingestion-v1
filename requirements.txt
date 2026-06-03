@@ -1,0 +1,2 @@
+# News Ingestion V1 currently uses only the Python standard library.
+# Keep this file so deployment platforms and new members know no pip install is required.
