@@ -38,6 +38,16 @@
 
 ## 成员本地运行
 
+先 clone 到成员自己的工作目录，不要在 `C:\windows\system32` 里操作：
+
+```powershell
+cd "$env:USERPROFILE\Desktop"
+git clone https://github.com/ZhuJiapei712/news-ingestion-v1.git
+cd news-ingestion-v1
+```
+
+如果仓库保持私有，成员需要先被加入 GitHub collaborator，或者使用有权限的 GitHub 账号登录。
+
 Windows PowerShell：
 
 ```powershell

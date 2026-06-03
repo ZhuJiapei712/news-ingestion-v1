@@ -13,11 +13,19 @@
 ## 1. Clone 仓库
 
 ```powershell
-git clone <你的GitHub仓库地址>
-cd NewsIngestionV1
+cd "$env:USERPROFILE\Desktop"
+git clone https://github.com/ZhuJiapei712/news-ingestion-v1.git
+cd news-ingestion-v1
 ```
 
-如果仓库名不是 `NewsIngestionV1`，进入实际目录即可。
+不要在 `C:\windows\system32` 里 clone。看到 PowerShell 提示符是 `PS C:\windows\system32>` 时，先切到桌面或自己的工作目录。
+
+如果仓库是私有仓库，成员必须先满足其中一个条件：
+
+- 组长已经在 GitHub 把该成员加为 collaborator。
+- 成员自己的 GitHub 账号已经登录，并且有该仓库访问权限。
+
+如果 clone 成功，才继续执行后面的 `cd`、`doctor.ps1` 和 `run.ps1`。
 
 ## 2. 自检
 
@@ -93,6 +101,43 @@ http://127.0.0.1:19080/api/v1/export/articles.xlsx?limit=500
 ```
 
 ## 6. 常见问题
+
+### `git clone` 后出现 TLS connect error
+
+常见原因是 Git 代理配置失效，例如本机配置了 `127.0.0.1:7890`，但代理软件没有启动或连接不稳定。
+
+先检查远端是否可访问：
+
+```powershell
+git ls-remote https://github.com/ZhuJiapei712/news-ingestion-v1.git HEAD
+```
+
+如果报 TLS 错误，检查代理：
+
+```powershell
+git config --global --get http.proxy
+git config --global --get https.proxy
+```
+
+如果显示的是本地代理地址，比如 `http://127.0.0.1:7890`，有两种处理方式：
+
+```powershell
+# 方式一：启动你的代理软件，然后重试 clone
+git clone https://github.com/ZhuJiapei712/news-ingestion-v1.git
+```
+
+```powershell
+# 方式二：不用代理访问 GitHub 时，清掉 Git 代理后重试
+git config --global --unset http.proxy
+git config --global --unset https.proxy
+git clone https://github.com/ZhuJiapei712/news-ingestion-v1.git
+```
+
+如果 `git ls-remote` 能返回一串 commit hash，但 clone 仍失败，通常是网络中断，换一个网络或稍后重试。
+
+### `cd news-ingestion-v1` 找不到路径
+
+说明前面的 `git clone` 没成功。先解决 clone 报错，不要继续执行后面的命令。
 
 ### PowerShell 不让执行脚本
 
