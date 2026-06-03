@@ -17,6 +17,7 @@ data/multisource_test/
 data/realtest/
 data/samples/
 data/doctor_sample/
+data/doctor_sample*/
 data/validated/
 data/tmp_*.html
 data/*.log

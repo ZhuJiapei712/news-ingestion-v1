@@ -63,6 +63,15 @@ data/daily/YYYYMMDD/
 - `crawl_report_YYYYMMDD.md`
 - `run_metadata_YYYYMMDD.jsonl`
 
+`articles_YYYYMMDD.jsonl` 使用 `ArticleRecord 2.0` 结构。优先看这些分区：
+
+- `source_info`：来源和栏目。
+- `time_info`：发布时间、抓取时间和时延。
+- `quality`：质量等级、复核标记和下游可用性。
+- `hotness`：榜单位置和稳定热度分。
+- `engagement`：阅读、评论、点赞、收藏、分享、转发等可用互动指标。
+- `extraction`：入口 URL 和列表位置，方便复查。
+
 ## 5. 导出数据
 
 启动本地 API：

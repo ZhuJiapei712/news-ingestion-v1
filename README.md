@@ -31,13 +31,13 @@ tags:
 
 ## 第一版定位
 
-V1 负责把外部新闻源转成统一的 `ArticleRecord`。后续的去重、热点聚类、事件抽取、情绪分析和热度排序都应该从这个标准格式开始。
+V1 负责把外部新闻源转成统一的 `ArticleRecord 2.0`。后续的去重、热点聚类、事件抽取、情绪分析和热度排序都应该从这个标准格式开始。
 
 ```text
 新闻源
 -> 抓取/正文抽取
--> ArticleRecord
--> hot_features
+-> ArticleRecord 2.0
+-> quality / hotness / engagement / extraction
 -> 质量门
 -> articles_YYYYMMDD.jsonl
 -> 热点聚类与事件库
@@ -165,14 +165,19 @@ dist/news-ingestion-v1-source.zip
 - 证券时报：20 条
 - 央视财经：20 条
 
-## 热点字段
+## ArticleRecord 2.0 字段
 
-每条输出都会包含 `hot_features`：
+最终 JSONL 会保留兼容字段，例如 `title`、`source`、`published_at`、`quality_score`，同时新增更清晰的分区：
 
-- `source_prominence`：源站列表排名、列表长度、源优先级、来源层级。
-- `engagement_metrics`：阅读、浏览、评论、点赞、收藏、分享、转发等互动字段。
+- `source_info`：来源 ID、名称、层级、角色、栏目和源优先级。
+- `time_info`：发布时间、抓取时间、日期、时区和抓取时延。
+- `content_info`：标题长度、正文长度、摘要、作者和关键词。
+- `quality`：状态、质量分、质量等级、复核标记和下游可用性。
+- `hotness`：榜单排名、榜单占位分位、源优先级、互动强度和稳定热度分。
+- `engagement`：阅读、浏览、评论、点赞、收藏、分享、转发等互动指标，明确区分真实 0 和缺失 `null`。
+- `extraction`：入口 URL、列表位置、原始 HTML 路径和抽取方法，便于复查和重跑。
 
-缺失值按真实语义保留：源站未暴露的字段为 `null`，真实返回 0 才写 0。当前新浪财经可通过评论计数接口记录 `comment_count`；东方财富、证券时报、央视财经当前未稳定暴露阅读、收藏、分享、转发等字段。
+互动指标缺失值按真实语义保留：源站未暴露的字段为 `null`，真实返回 0 才写 0。当前新浪财经可通过评论计数接口记录 `comment_count`；东方财富、证券时报、央视财经当前未稳定暴露阅读、收藏、分享、转发等字段。
 
 2026-06-02 真实采集验证：
 
@@ -187,7 +192,7 @@ comment_count=30/90
 
 - 每条有效新闻都有 `title`、`url`、`source`、`crawled_at`。
 - 每条有效新闻都有 `article_id`、`content_hash`、`quality_score`。
-- 每条有效新闻都有 `hot_features.source_prominence`。
+- 每条有效新闻都有 `source_info`、`time_info`、`content_info`、`quality`、`hotness`、`engagement`、`extraction`。
 - 互动指标必须区分真实 0 和缺失 `null`。
 - 无法进入下游的数据进入 `rejected_YYYYMMDD.jsonl`。
 - 每日生成 `crawl_report_YYYYMMDD.md`。

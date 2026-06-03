@@ -2,34 +2,41 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.quant-news-agent/schemas/article_record.schema.json",
   "title": "ArticleRecord",
+  "description": "Structured finance news record with readable top-level fields and audit-friendly extraction details.",
   "type": "object",
   "additionalProperties": true,
-  "required": ["article_id", "source", "title", "url", "crawled_at", "quality_score", "status"],
+  "required": ["schema_version", "record_type", "article_id", "source", "title", "url", "crawled_at", "quality_score", "status"],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "ArticleRecord schema version. Version 2.0 adds clear source, time, content, quality, hotness and engagement sections."
+    },
+    "record_type": {
+      "type": "string",
+      "enum": ["finance_news_article"]
+    },
     "article_id": {
       "type": "string",
       "description": "Stable SHA-256 identifier generated from source and URL or source, title and time."
-    },
-    "source": {
-      "type": "string"
-    },
-    "source_id": {
-      "type": "string"
-    },
-    "source_tier": {
-      "type": "string",
-      "enum": ["T0", "T1", "T2", "T3", "UNKNOWN"]
     },
     "title": {
       "type": "string",
       "minLength": 1
     },
-    "content": {
-      "type": ["string", "null"]
-    },
     "url": {
       "type": "string",
       "format": "uri"
+    },
+    "source": {
+      "type": "string",
+      "description": "Legacy source name kept for compatibility. Prefer source_info.name in new consumers."
+    },
+    "source_id": {
+      "type": ["string", "null"]
+    },
+    "source_tier": {
+      "type": "string",
+      "enum": ["T0", "T1", "T2", "T3", "UNKNOWN"]
     },
     "published_at": {
       "type": ["string", "null"],
@@ -39,63 +46,9 @@
       "type": "string",
       "format": "date-time"
     },
-    "author": {
-      "type": ["string", "null"]
-    },
-    "section": {
-      "type": ["string", "null"]
-    },
-    "keywords": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "raw_html_path": {
-      "type": ["string", "null"]
-    },
-    "hot_features": {
-      "type": "object",
-      "description": "Hotness and engagement features captured from the source when available.",
-      "additionalProperties": true,
-      "properties": {
-        "source_prominence": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "list_rank": { "type": ["integer", "null"] },
-            "list_size": { "type": ["integer", "null"] },
-            "source_priority": { "type": ["integer", "null"] },
-            "source_tier": { "type": ["string", "null"] },
-            "entrypoint": { "type": ["string", "null"] },
-            "captured_at": { "type": ["string", "null"], "format": "date-time" }
-          }
-        },
-        "engagement_metrics": {
-          "type": "object",
-          "additionalProperties": true,
-          "properties": {
-            "read_count": { "type": ["integer", "null"] },
-            "view_count": { "type": ["integer", "null"] },
-            "comment_count": { "type": ["integer", "null"] },
-            "like_count": { "type": ["integer", "null"] },
-            "favorite_count": { "type": ["integer", "null"] },
-            "share_count": { "type": ["integer", "null"] },
-            "repost_count": { "type": ["integer", "null"] },
-            "collected_at": { "type": ["string", "null"], "format": "date-time" },
-            "available_fields": { "type": "array", "items": { "type": "string" } },
-            "missing_fields": { "type": "array", "items": { "type": "string" } },
-            "quality_flags": { "type": "array", "items": { "type": "string" } },
-            "raw": { "type": "object", "additionalProperties": true }
-          }
-        }
-      }
-    },
-    "content_hash": {
-      "type": ["string", "null"]
-    },
-    "title_hash": {
-      "type": ["string", "null"]
+    "status": {
+      "type": "string",
+      "enum": ["valid", "review", "rejected"]
     },
     "quality_score": {
       "type": "number",
@@ -104,13 +57,136 @@
     },
     "quality_flags": {
       "type": "array",
-      "items": {
-        "type": "string"
+      "items": { "type": "string" }
+    },
+    "source_info": {
+      "type": "object",
+      "description": "Readable source metadata for filtering and source-level analysis.",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "name": { "type": ["string", "null"] },
+        "tier": { "type": ["string", "null"] },
+        "role": { "type": ["string", "null"] },
+        "priority": { "type": ["integer", "null"] },
+        "section": { "type": ["string", "null"] }
       }
     },
-    "status": {
-      "type": "string",
-      "enum": ["valid", "review", "rejected"]
+    "time_info": {
+      "type": "object",
+      "description": "Normalized time fields used to check freshness and avoid look-ahead bias.",
+      "additionalProperties": true,
+      "properties": {
+        "published_at": { "type": ["string", "null"], "format": "date-time" },
+        "published_date": { "type": ["string", "null"], "format": "date" },
+        "crawled_at": { "type": ["string", "null"], "format": "date-time" },
+        "crawl_date": { "type": ["string", "null"], "format": "date" },
+        "timezone": { "type": "string" },
+        "age_minutes_at_crawl": { "type": ["number", "null"] },
+        "published_after_crawl": { "type": "boolean" }
+      }
+    },
+    "content_info": {
+      "type": "object",
+      "description": "Compact content summary and text coverage indicators.",
+      "additionalProperties": true,
+      "properties": {
+        "title_length": { "type": "integer" },
+        "content_length": { "type": "integer" },
+        "has_content": { "type": "boolean" },
+        "excerpt": { "type": "string" },
+        "author": { "type": ["string", "null"] },
+        "keywords": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "description": "Human-readable quality decision used before downstream processing.",
+      "additionalProperties": true,
+      "properties": {
+        "status": { "type": "string", "enum": ["valid", "review", "rejected"] },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "grade": { "type": "string", "enum": ["A", "B", "C", "D", "R"] },
+        "flags": { "type": "array", "items": { "type": "string" } },
+        "review_required": { "type": "boolean" },
+        "downstream_usable": { "type": "boolean" }
+      }
+    },
+    "hotness": {
+      "type": "object",
+      "description": "Stable hotness features captured at crawl time. This is separate from later ranking logic.",
+      "additionalProperties": true,
+      "properties": {
+        "score": { "type": "number" },
+        "list_rank": { "type": ["integer", "null"] },
+        "list_size": { "type": ["integer", "null"] },
+        "rank_percentile": { "type": ["number", "null"] },
+        "source_priority": { "type": ["integer", "null"] },
+        "source_tier": { "type": ["string", "null"] },
+        "has_engagement_metrics": { "type": "boolean" },
+        "engagement_score": { "type": "number" }
+      }
+    },
+    "engagement": {
+      "type": "object",
+      "description": "Flattened engagement metrics with explicit availability and missing-field semantics.",
+      "additionalProperties": true,
+      "properties": {
+        "has_any_metric": { "type": "boolean" },
+        "available_metrics": { "type": "array", "items": { "type": "string" } },
+        "missing_metrics": { "type": "array", "items": { "type": "string" } },
+        "available_metric_count": { "type": "integer" },
+        "counts": {
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "null"] }
+        },
+        "score": { "type": "number" },
+        "metric_source": { "type": ["string", "null"] },
+        "collected_at": { "type": ["string", "null"], "format": "date-time" },
+        "quality_flags": { "type": "array", "items": { "type": "string" } },
+        "raw": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "description": "Evidence and route details for audit, rerun and source debugging.",
+      "additionalProperties": true,
+      "properties": {
+        "entrypoint_url": { "type": ["string", "null"] },
+        "raw_html_path": { "type": ["string", "null"] },
+        "list_rank": { "type": ["integer", "null"] },
+        "list_size": { "type": ["integer", "null"] },
+        "captured_at": { "type": ["string", "null"], "format": "date-time" },
+        "method": { "type": ["string", "null"] }
+      }
+    },
+    "content": {
+      "type": ["string", "null"]
+    },
+    "author": {
+      "type": ["string", "null"]
+    },
+    "section": {
+      "type": ["string", "null"]
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "hot_features": {
+      "type": "object",
+      "description": "Legacy nested hotness object kept for compatibility.",
+      "additionalProperties": true
+    },
+    "content_hash": {
+      "type": ["string", "null"]
+    },
+    "title_hash": {
+      "type": ["string", "null"]
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": true
     }
   }
 }

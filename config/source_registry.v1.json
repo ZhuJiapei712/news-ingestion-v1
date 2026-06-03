@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "owner": "财经新闻数据Agent-数据抓取组",
+  "owner": "news-ingestion-v1",
   "timezone": "Asia/Shanghai",
   "crawl_policy": {
     "respect_robots_txt": true,

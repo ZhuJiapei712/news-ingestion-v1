@@ -104,4 +104,5 @@ dist/news-ingestion-v1-source.zip
 
 - 新闻源页面结构可能变化，适配器需要定期维护。
 - 下载和导出接口可以直接使用；手动刷新接口应使用 `NEWS_API_TOKEN` 保护。
+- JSONL 默认使用 `ArticleRecord 2.0`，其中 `source_info`、`time_info`、`quality`、`hotness`、`engagement`、`extraction` 是推荐读取入口。
 - 真实新闻全文和原始 HTML 的再分发需要遵守来源网站条款和数据使用规范。

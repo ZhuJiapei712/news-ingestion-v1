@@ -16,8 +16,9 @@ def _avg_quality(records: list[dict[str, Any]]) -> str:
 def _metrics_available_count(records: list[dict[str, Any]]) -> int:
     count = 0
     for record in records:
+        engagement = record.get("engagement") or {}
         metrics = record.get("hot_features", {}).get("engagement_metrics", {})
-        if metrics.get("available_fields"):
+        if engagement.get("has_any_metric") or metrics.get("available_fields"):
             count += 1
     return count
 
@@ -25,8 +26,9 @@ def _metrics_available_count(records: list[dict[str, Any]]) -> int:
 def _prominence_available_count(records: list[dict[str, Any]]) -> int:
     count = 0
     for record in records:
+        hotness = record.get("hotness") or {}
         prominence = record.get("hot_features", {}).get("source_prominence", {})
-        if prominence.get("list_rank") is not None:
+        if hotness.get("list_rank") is not None or prominence.get("list_rank") is not None:
             count += 1
     return count
 
@@ -34,9 +36,20 @@ def _prominence_available_count(records: list[dict[str, Any]]) -> int:
 def _metric_field_counts(records: list[dict[str, Any]]) -> Counter[str]:
     counts: Counter[str] = Counter()
     for record in records:
+        engagement = record.get("engagement") or {}
         metrics = record.get("hot_features", {}).get("engagement_metrics", {})
-        for field in metrics.get("available_fields") or []:
+        fields = engagement.get("available_metrics") or metrics.get("available_fields") or []
+        for field in fields:
             counts[field] += 1
+    return counts
+
+
+def _grade_counts(records: list[dict[str, Any]]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for record in records:
+        grade = (record.get("quality") or {}).get("grade")
+        if grade:
+            counts[str(grade)] += 1
     return counts
 
 
@@ -80,6 +93,10 @@ def build_report(
     lines.append(f"| 平均质量分 | {_avg_quality(all_records)} |")
     lines.append(f"| 列表排名覆盖 | {_prominence_available_count(all_records)}/{len(all_records)} |")
     lines.append(f"| 互动指标覆盖 | {_metrics_available_count(all_records)}/{len(all_records)} |")
+    grade_counts = _grade_counts(all_records)
+    if grade_counts:
+        grade_summary = ", ".join(f"{grade}:{count}" for grade, count in sorted(grade_counts.items()))
+        lines.append(f"| 质量等级分布 | {grade_summary} |")
     lines.append("")
     lines.append("## 数据源表现")
     lines.append("")

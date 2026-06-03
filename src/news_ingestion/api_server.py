@@ -28,23 +28,34 @@ DEFAULT_INBOX_DIR = PRODUCT_ROOT / "data" / "inbox"
 API_VERSION = "v1"
 EXPORT_METRIC_FIELDS = ["read_count", "view_count", "comment_count", "like_count", "favorite_count", "share_count", "repost_count"]
 EXPORT_FIELDNAMES = [
+    "schema_version",
     "article_id",
     "title",
-    "source",
+    "source_name",
     "source_id",
     "source_tier",
+    "source_role",
+    "source_section",
     "published_at",
+    "published_date",
     "crawled_at",
+    "age_minutes_at_crawl",
     "author",
-    "section",
     "status",
     "quality_score",
+    "quality_grade",
+    "review_required",
     "quality_flags",
-    "hot_rank_score",
+    "hot_score",
     "list_rank",
     "list_size",
+    "rank_percentile",
     "source_priority",
-    "engagement_available_fields",
+    "has_engagement_metrics",
+    "available_metric_count",
+    "engagement_score",
+    "metric_source",
+    "engagement_available_metrics",
     "read_count",
     "view_count",
     "comment_count",
@@ -53,6 +64,7 @@ EXPORT_FIELDNAMES = [
     "share_count",
     "repost_count",
     "url",
+    "content_length",
     "content_excerpt",
 ]
 
@@ -139,6 +151,9 @@ def parse_record_time(record: dict[str, Any]) -> datetime | None:
 
 
 def hot_rank_score(record: dict[str, Any]) -> float:
+    hotness = record.get("hotness") or {}
+    if isinstance(hotness.get("score"), (int, float)):
+        return float(hotness["score"])
     hot_features = record.get("hot_features") or {}
     prominence = hot_features.get("source_prominence") or {}
     metrics = hot_features.get("engagement_metrics") or {}
@@ -176,6 +191,8 @@ def hot_rank_score(record: dict[str, Any]) -> float:
 def public_article(record: dict[str, Any], include_content: bool = False) -> dict[str, Any]:
     content = record.get("content") or ""
     item = {
+        "schema_version": record.get("schema_version"),
+        "record_type": record.get("record_type"),
         "article_id": record.get("article_id"),
         "title": record.get("title"),
         "source": record.get("source"),
@@ -190,7 +207,14 @@ def public_article(record: dict[str, Any], include_content: bool = False) -> dic
         "status": record.get("status"),
         "quality_score": record.get("quality_score"),
         "quality_flags": record.get("quality_flags") or [],
+        "quality": record.get("quality") or {},
         "hot_rank_score": hot_rank_score(record),
+        "hotness": record.get("hotness") or {},
+        "engagement": record.get("engagement") or {},
+        "source_info": record.get("source_info") or {},
+        "time_info": record.get("time_info") or {},
+        "content_info": record.get("content_info") or {},
+        "extraction": record.get("extraction") or {},
         "hot_features": record.get("hot_features") or {},
         "content_excerpt": content[:240],
     }
@@ -208,32 +232,51 @@ def compact_text(value: Any, max_length: int | None = None) -> str:
 
 def export_article(record: dict[str, Any], include_content: bool = False) -> dict[str, Any]:
     content = record.get("content") or ""
+    source_info = record.get("source_info") or {}
+    time_info = record.get("time_info") or {}
+    content_info = record.get("content_info") or {}
+    quality = record.get("quality") or {}
+    hotness = record.get("hotness") or {}
+    engagement = record.get("engagement") or {}
     hot_features = record.get("hot_features") or {}
     prominence = hot_features.get("source_prominence") or {}
     metrics = hot_features.get("engagement_metrics") or {}
+    counts = engagement.get("counts") or {}
     item = {
+        "schema_version": record.get("schema_version"),
         "article_id": record.get("article_id"),
         "title": compact_text(record.get("title")),
-        "source": compact_text(record.get("source")),
-        "source_id": record.get("source_id"),
-        "source_tier": record.get("source_tier"),
-        "published_at": record.get("published_at"),
-        "crawled_at": record.get("crawled_at"),
+        "source_name": compact_text(source_info.get("name") or record.get("source")),
+        "source_id": source_info.get("id") or record.get("source_id"),
+        "source_tier": source_info.get("tier") or record.get("source_tier"),
+        "source_role": source_info.get("role"),
+        "source_section": source_info.get("section") or compact_text(record.get("section")),
+        "published_at": time_info.get("published_at") or record.get("published_at"),
+        "published_date": time_info.get("published_date"),
+        "crawled_at": time_info.get("crawled_at") or record.get("crawled_at"),
+        "age_minutes_at_crawl": time_info.get("age_minutes_at_crawl"),
         "author": compact_text(record.get("author")),
-        "section": compact_text(record.get("section")),
         "status": record.get("status"),
         "quality_score": record.get("quality_score"),
-        "quality_flags": ";".join(record.get("quality_flags") or []),
-        "hot_rank_score": hot_rank_score(record),
-        "list_rank": prominence.get("list_rank"),
-        "list_size": prominence.get("list_size"),
-        "source_priority": prominence.get("source_priority"),
-        "engagement_available_fields": ";".join(metrics.get("available_fields") or []),
+        "quality_grade": quality.get("grade"),
+        "review_required": quality.get("review_required"),
+        "quality_flags": ";".join(quality.get("flags") or record.get("quality_flags") or []),
+        "hot_score": hotness.get("score") if hotness else hot_rank_score(record),
+        "list_rank": hotness.get("list_rank") if hotness else prominence.get("list_rank"),
+        "list_size": hotness.get("list_size") if hotness else prominence.get("list_size"),
+        "rank_percentile": hotness.get("rank_percentile"),
+        "source_priority": hotness.get("source_priority") if hotness else prominence.get("source_priority"),
+        "has_engagement_metrics": engagement.get("has_any_metric"),
+        "available_metric_count": engagement.get("available_metric_count"),
+        "engagement_score": engagement.get("score"),
+        "metric_source": engagement.get("metric_source") or metrics.get("source"),
+        "engagement_available_metrics": ";".join(engagement.get("available_metrics") or metrics.get("available_fields") or []),
         "url": record.get("url"),
-        "content_excerpt": compact_text(content, 300),
+        "content_length": content_info.get("content_length") if content_info else len(content),
+        "content_excerpt": compact_text(content_info.get("excerpt") or content, 300),
     }
     for field in EXPORT_METRIC_FIELDS:
-        item[field] = metrics.get(field)
+        item[field] = counts.get(field) if counts else metrics.get(field)
     if include_content:
         item["content"] = compact_text(content)
     return item
@@ -251,7 +294,7 @@ def csv_text(records: list[dict[str, Any]], include_content: bool = False) -> st
 
 def jsonl_text(records: list[dict[str, Any]], include_content: bool = False, flattened: bool = False) -> str:
     rows = [export_article(record, include_content=include_content) if flattened else public_article(record, include_content=include_content) for record in records]
-    return "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in rows)
+    return "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
 
 
 def column_letter(index: int) -> str:
@@ -560,8 +603,9 @@ class NewsApiHandler(BaseHTTPRequestHandler):
             status = record.get("status")
             if status in {"valid", "review", "rejected"}:
                 group[status] += 1
+            engagement = record.get("engagement") or {}
             metrics = record.get("hot_features", {}).get("engagement_metrics", {})
-            if metrics.get("available_fields"):
+            if engagement.get("has_any_metric") or metrics.get("available_fields"):
                 group["metric_count"] += 1
         self.respond_json(
             {

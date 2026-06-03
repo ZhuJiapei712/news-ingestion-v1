@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
+
+CN_TZ = ZoneInfo("Asia/Shanghai")
+ARTICLE_SCHEMA_VERSION = "2.0"
+METRIC_FIELDS = ["read_count", "view_count", "comment_count", "like_count", "favorite_count", "share_count", "repost_count"]
 
 DEFAULT_RULES = {
     "required_fields": ["title", "url", "source", "crawled_at"],
@@ -77,6 +83,230 @@ def source_authority_score(record: dict[str, Any], source_index: dict[str, dict[
     tier = source.get("tier") or record.get("source_tier") or "UNKNOWN"
     tier_score = {"T0": 1.0, "T1": 0.88, "T2": 0.62, "T3": 0.72, "UNKNOWN": 0.5}
     return float(source.get("quality_weight", tier_score.get(str(tier), 0.5))), str(tier)
+
+
+def compact_text(value: Any, max_length: int | None = None) -> str:
+    text = " ".join(str(value or "").split())
+    if max_length is not None:
+        return text[:max_length]
+    return text
+
+
+def as_cn_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=CN_TZ)
+    return value.astimezone(CN_TZ)
+
+
+def date_part(value: datetime | None) -> str | None:
+    normalized = as_cn_datetime(value)
+    return normalized.date().isoformat() if normalized else None
+
+
+def age_minutes(published_at: datetime | None, crawled_at: datetime | None) -> float | None:
+    published = as_cn_datetime(published_at)
+    crawled = as_cn_datetime(crawled_at)
+    if not published or not crawled:
+        return None
+    return round((crawled - published).total_seconds() / 60, 2)
+
+
+def quality_grade(score: float, status: str) -> str:
+    if status == "rejected":
+        return "D"
+    if score >= 0.95:
+        return "A"
+    if score >= 0.85:
+        return "B"
+    if score >= 0.75:
+        return "C"
+    return "R"
+
+
+def metric_value(metrics: dict[str, Any], field: str) -> int | None:
+    value = metrics.get(field)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
+
+
+def engagement_strength(metrics: dict[str, Any]) -> float:
+    weights = {
+        "read_count": 1.0,
+        "view_count": 1.0,
+        "comment_count": 3.0,
+        "like_count": 1.5,
+        "favorite_count": 1.8,
+        "share_count": 2.2,
+        "repost_count": 2.5,
+    }
+    score = 0.0
+    for field, weight in weights.items():
+        value = metric_value(metrics, field)
+        if value is not None and value > 0:
+            score += math.log10(value + 1) * weight
+    return round(score, 4)
+
+
+def rank_percentile(prominence: dict[str, Any]) -> float | None:
+    rank = prominence.get("list_rank")
+    size = prominence.get("list_size")
+    if not isinstance(rank, int) or not isinstance(size, int) or size <= 0:
+        return None
+    return round(max(0.0, (size - rank + 1) / size), 4)
+
+
+def hotness_score(quality_score: float, prominence: dict[str, Any], metrics: dict[str, Any]) -> float:
+    source_priority = prominence.get("source_priority")
+    priority_score = float(source_priority or 0) * 3.0
+    rank_score = (rank_percentile(prominence) or 0.0) * 35.0
+    metric_score = engagement_strength(metrics) * 3.0
+    return round(quality_score * 30.0 + priority_score + rank_score + metric_score, 4)
+
+
+def build_clear_fields(
+    normalized: dict[str, Any],
+    source_meta: dict[str, Any],
+    quality_score: float,
+    status: str,
+    flags: list[str],
+    published_at: datetime | None,
+    crawled_at: datetime | None,
+) -> dict[str, Any]:
+    hot_features = normalized.get("hot_features") or {}
+    prominence = hot_features.get("source_prominence") or {}
+    metrics = hot_features.get("engagement_metrics") or {}
+    counts = {field: metric_value(metrics, field) for field in METRIC_FIELDS}
+    available_metrics = [field for field in METRIC_FIELDS if counts.get(field) is not None]
+    missing_metrics = [field for field in METRIC_FIELDS if counts.get(field) is None]
+    content = str(normalized.get("content") or "")
+    title = str(normalized.get("title") or "")
+    age_at_crawl = age_minutes(published_at, crawled_at)
+
+    source_info = {
+        "id": normalized.get("source_id"),
+        "name": normalized.get("source"),
+        "tier": normalized.get("source_tier"),
+        "role": source_meta.get("role"),
+        "priority": source_meta.get("priority") or prominence.get("source_priority"),
+        "section": normalized.get("section"),
+    }
+    time_info = {
+        "published_at": normalized.get("published_at"),
+        "published_date": date_part(published_at),
+        "crawled_at": normalized.get("crawled_at"),
+        "crawl_date": date_part(crawled_at),
+        "timezone": "Asia/Shanghai",
+        "age_minutes_at_crawl": age_at_crawl,
+        "published_after_crawl": age_at_crawl is not None and age_at_crawl < 0,
+    }
+    content_info = {
+        "title_length": len(title),
+        "content_length": len(content),
+        "has_content": bool(content),
+        "excerpt": compact_text(content, 240),
+        "author": normalized.get("author"),
+        "keywords": normalized.get("keywords") or [],
+    }
+    quality = {
+        "status": status,
+        "score": quality_score,
+        "grade": quality_grade(quality_score, status),
+        "flags": sorted(set(flags)),
+        "review_required": status == "review" or bool(set(flags) - {"missing_published_at", "no_engagement_metrics_found"}),
+        "downstream_usable": status in {"valid", "review"},
+    }
+    engagement = {
+        "has_any_metric": bool(available_metrics),
+        "available_metrics": available_metrics,
+        "missing_metrics": missing_metrics,
+        "available_metric_count": len(available_metrics),
+        "counts": counts,
+        "score": engagement_strength(metrics),
+        "metric_source": metrics.get("source"),
+        "collected_at": metrics.get("collected_at"),
+        "quality_flags": metrics.get("quality_flags") or [],
+        "raw": metrics.get("raw") or {},
+    }
+    hotness = {
+        "score": hotness_score(quality_score, prominence, metrics),
+        "list_rank": prominence.get("list_rank"),
+        "list_size": prominence.get("list_size"),
+        "rank_percentile": rank_percentile(prominence),
+        "source_priority": source_info["priority"],
+        "source_tier": source_info["tier"],
+        "has_engagement_metrics": engagement["has_any_metric"],
+        "engagement_score": engagement["score"],
+    }
+    extraction = {
+        "entrypoint_url": normalized.get("fetch_entrypoint") or prominence.get("entrypoint"),
+        "raw_html_path": normalized.get("raw_html_path"),
+        "list_rank": prominence.get("list_rank"),
+        "list_size": prominence.get("list_size"),
+        "captured_at": prominence.get("captured_at") or normalized.get("crawled_at"),
+        "method": normalized.get("section") or "source_adapter",
+    }
+    diagnostics = {
+        "content_hash": normalized.get("content_hash"),
+        "title_hash": normalized.get("title_hash"),
+        "quality_flags": sorted(set(flags)),
+    }
+    return {
+        "source_info": source_info,
+        "time_info": time_info,
+        "content_info": content_info,
+        "quality": quality,
+        "hotness": hotness,
+        "engagement": engagement,
+        "extraction": extraction,
+        "diagnostics": diagnostics,
+    }
+
+
+def ordered_record(normalized: dict[str, Any]) -> dict[str, Any]:
+    preferred_keys = [
+        "schema_version",
+        "record_type",
+        "article_id",
+        "title",
+        "url",
+        "source",
+        "source_id",
+        "source_tier",
+        "published_at",
+        "crawled_at",
+        "status",
+        "quality_score",
+        "quality_flags",
+        "hotness",
+        "engagement",
+        "source_info",
+        "time_info",
+        "content_info",
+        "extraction",
+        "quality",
+        "content",
+        "author",
+        "section",
+        "keywords",
+        "hot_features",
+        "diagnostics",
+        "content_hash",
+        "title_hash",
+        "raw_html_path",
+        "fetch_entrypoint",
+    ]
+    ordered = {key: normalized[key] for key in preferred_keys if key in normalized}
+    for key, value in normalized.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered
 
 
 def evaluate_record(
@@ -155,6 +385,8 @@ def evaluate_record(
         timestamp_score -= 0.15
     timestamp_score = max(timestamp_score, 0.0)
 
+    source_key = normalized.get("source_id") or normalized.get("source")
+    source_meta = source_index.get(str(source_key), {})
     authority_score, source_tier = source_authority_score(normalized, source_index)
     quality_score = (
         field_score * weights.get("field_completeness", 0.35)
@@ -227,4 +459,8 @@ def evaluate_record(
             },
         },
     )
-    return normalized
+    clear_fields = build_clear_fields(normalized, source_meta, quality_score, status, flags, published_at, crawled_at)
+    normalized["schema_version"] = ARTICLE_SCHEMA_VERSION
+    normalized["record_type"] = "finance_news_article"
+    normalized.update(clear_fields)
+    return ordered_record(normalized)
